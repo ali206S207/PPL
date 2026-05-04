@@ -1813,6 +1813,7 @@
 
 const MEMBER_CODES = {
   '8673': 'أحمد',
+  '2649': 'محمد',
   '8704': 'علي',
   '7551': 'عمر',
   '5970': 'كريم',
@@ -1966,16 +1967,18 @@ function saveState() {
 // ============================================================
 // LOCK SCREEN
 // ============================================================
-// ── Device fingerprint (بسيط وكافي) ──
+// ── Device UUID — فريد لكل جهاز، مستحيل يتكرر ──
 function getFingerprint() {
-  const s = [
-    navigator.language, screen.width, screen.height,
-    screen.colorDepth, new Date().getTimezoneOffset(),
-    navigator.hardwareConcurrency || 0
-  ].join('|');
-  let h = 0;
-  for (let i = 0; i < s.length; i++) { h = Math.imul(31, h) + s.charCodeAt(i) | 0; }
-  return Math.abs(h).toString(36);
+  // لو عندنا UUID محفوظ على الجهاز ده، ارجعه
+  let uid = localStorage.getItem('tefa_device_uid');
+  if (uid) return uid;
+  // ولد UUID جديد عشوائي خالص
+  uid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+  localStorage.setItem('tefa_device_uid', uid);
+  return uid;
 }
 
 function initLock() {
