@@ -1967,18 +1967,37 @@ function saveState() {
 // ============================================================
 // LOCK SCREEN
 // ============================================================
-// ── Device UUID — فريد لكل جهاز، مستحيل يتكرر ──
-function getFingerprint() {
-  // لو عندنا UUID محفوظ على الجهاز ده، ارجعه
+// ── Supabase config ──
+const SUPA_URL = 'https://ublurrzfsxikexfhqbns.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVibHVycnpmc3hpa2V4ZmhxYm5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDEyODEsImV4cCI6MjA5MzExNzI4MX0.SPlW6T2iBg8tTkFbp1FXDKHaoZrkDlnUAxlUPNhIiFQ';
+
+// ── Device UUID ──
+function getDeviceUID() {
   let uid = localStorage.getItem('tefa_device_uid');
   if (uid) return uid;
-  // ولد UUID جديد عشوائي خالص
   uid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = Math.random() * 16 | 0;
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
   });
   localStorage.setItem('tefa_device_uid', uid);
   return uid;
+}
+function getFingerprint() { return getDeviceUID(); }
+
+// ── Supabase helpers ──
+async function supaFetch(path, opts={}) {
+  const res = await fetch(SUPA_URL + '/rest/v1/' + path, {
+    ...opts,
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': opts.prefer || 'return=representation',
+      ...opts.headers
+    }
+  });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
 }
 
 function initLock() {
@@ -1996,30 +2015,73 @@ function initLock() {
   checkSavedSession();
 }
 
-function checkSavedSession() {
+async function checkSavedSession() {
   try {
     const saved = JSON.parse(localStorage.getItem('tefa_session') || 'null');
     if (!saved) return;
+
+    // كود موجود في الملف؟
     if (!MEMBER_CODES[saved.code]) {
       localStorage.removeItem('tefa_session');
       showLockError('🚫 تم إلغاء وصولك — تواصل مع TEFA GYM');
       return;
     }
-    const fp = getFingerprint();
-    if (saved.fp !== fp) {
-      showLockError('⚠️ هذا الجهاز غير مصرح له');
+
+    showLockError('⏳ جاري التحقق...');
+
+    // تحقق من السيرفر
+    const rows = await supaFetch(`members?code=eq.${saved.code}&select=device_uid,status,expire_at`);
+
+    if (!rows || rows.length === 0) {
+      localStorage.removeItem('tefa_session');
+      showLockError('🚫 تم إلغاء وصولك — تواصل مع TEFA GYM');
       return;
     }
-    if (Date.now() > saved.expiry) {
+
+    const member = rows[0];
+
+    // محظور؟
+    if (member.status === 'blocked') {
+      localStorage.removeItem('tefa_session');
+      showLockError('🚫 تم إلغاء وصولك — تواصل مع TEFA GYM');
+      return;
+    }
+
+    // انتهى الاشتراك؟
+    if (member.expire_at && new Date(member.expire_at) < new Date()) {
       localStorage.removeItem('tefa_session');
       showLockError('انتهى اشتراكك — تواصل مع TEFA GYM 🏋️');
       return;
     }
+
+    // الجهاز مختلف؟
+    const myUID = getDeviceUID();
+    if (member.device_uid && member.device_uid !== myUID) {
+      localStorage.removeItem('tefa_session');
+      showLockError('🚫 هذا الكود مفعّل على جهاز آخر');
+      return;
+    }
+
+    // كل حاجة تمام — حدّث last_seen
+    supaFetch(`members?code=eq.${saved.code}`, {
+      method: 'PATCH',
+      prefer: 'return=minimal',
+      body: JSON.stringify({ last_seen: new Date().toISOString() })
+    });
+
+    showLockError('');
     unlockApp(saved.name);
-  } catch(e) {}
+  } catch(e) {
+    // لو مفيش نت — يدخل بالـ session المحفوظة
+    const saved = JSON.parse(localStorage.getItem('tefa_session') || 'null');
+    if (saved && MEMBER_CODES[saved.code]) {
+      showLockError('');
+      unlockApp(saved.name);
+    }
+  }
 }
 
-function checkCode() {
+async function checkCode() {
   const raw = document.getElementById('codeInput').value.trim().toUpperCase();
 
   // Admin shortcut
@@ -2083,62 +2145,98 @@ function unlockApp(name) {
 }
 
 // ── Admin Panel ──
-function openAdminPanel() {
-  const rows = Object.entries(MEMBER_CODES).map(([code, mName], i) => {
-    const memberNum = 'M-' + String(i+1).padStart(2,'0');
-    const usedFP = localStorage.getItem('tefa_used_' + code);
-    const used = usedFP ? '🔴 مفعّل' : '🟢 متاح';
-    return `<tr style="border-bottom:1px solid #1a1a1a">
-      <td style="padding:9px 12px;color:#888;font-size:11px">${memberNum}</td>
-      <td style="padding:9px 12px;color:#F5C842;font-family:monospace;font-size:15px;letter-spacing:3px">${code}</td>
-      <td style="padding:9px 12px;font-size:12px">${used}</td>
-      <td style="padding:9px 12px">
-        ${usedFP ? `<button onclick="resetCode('${code}')" style="background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#ff6666;padding:5px 10px;cursor:pointer;font-size:11px;font-family:Cairo,sans-serif">↺ تعيين</button>` : '<span style="color:#333">—</span>'}
-      </td>
-    </tr>`;
-  }).join('');
-
+async function openAdminPanel() {
   const panel = document.createElement('div');
   panel.id = 'adminPanel';
   panel.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0a0a0a;overflow-y:auto;padding:24px 16px;direction:rtl';
   panel.innerHTML = `
-    <div style="max-width:480px;margin:0 auto">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+    <div style="max-width:500px;margin:0 auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
         <div style="font-family:Bebas Neue,sans-serif;font-size:26px;letter-spacing:4px;color:#F5C842">⚙ ADMIN PANEL</div>
         <button onclick="document.getElementById('adminPanel').remove()" style="background:#222;border:1px solid #333;border-radius:8px;color:#aaa;padding:8px 14px;cursor:pointer;font-size:13px">✕ خروج</button>
       </div>
-      <div style="background:#111;border:1px solid #333;border-radius:14px;overflow:hidden;margin-bottom:16px">
-        <div style="padding:12px 16px;background:#181818;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:12px;color:#555;letter-spacing:2px">قائمة الأكواد</span>
-          <span style="font-size:12px;color:#F5C842">${Object.keys(MEMBER_CODES).length} كود</span>
-        </div>
-        <table style="width:100%;border-collapse:collapse">
-          <thead><tr style="background:#0d0d0d">
-            <th style="padding:9px 12px;text-align:right;font-size:10px;color:#444">#</th>
-            <th style="padding:9px 12px;text-align:right;font-size:10px;color:#444">الكود</th>
-            <th style="padding:9px 12px;text-align:right;font-size:10px;color:#444">الحالة</th>
-            <th style="padding:9px 12px;text-align:right;font-size:10px;color:#444">إجراء</th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
+      <div id="adminBody" style="background:#111;border:1px solid #333;border-radius:14px;overflow:hidden;margin-bottom:16px">
+        <div style="padding:20px;text-align:center;color:#555">⏳ جاري التحميل...</div>
       </div>
-      <div style="background:#111;border:1px solid #222;border-radius:12px;padding:14px;font-size:12px;color:#555;line-height:1.9">
-        🔴 مفعّل = اتفعّل على جهاز<br>
-        🟢 متاح = لسه محدش استخدمه<br>
-        ↺ تعيين = بتحرر الكود لجهاز جديد<br>
-        🔐 كود الأدمن: <span style="color:#F5C842;font-family:monospace">${ADMIN_PASS}</span>
-      </div>
-    </div>
-  `;
+    </div>`;
   document.body.appendChild(panel);
+
+  try {
+    const rows = await supaFetch('members?select=code,member_num,device_uid,status,last_seen,expire_at&order=member_num.asc');
+    if (!rows) throw new Error('no data');
+
+    const activated = rows.filter(r => r.device_uid).length;
+    const blocked   = rows.filter(r => r.status === 'blocked').length;
+
+    const trs = rows.map(r => {
+      const isActive   = !!r.device_uid;
+      const isBlocked  = r.status === 'blocked';
+      const lastSeen   = r.last_seen ? new Date(r.last_seen).toLocaleDateString('ar-EG') : '—';
+      const statusIcon = isBlocked ? '🔴 محظور' : isActive ? '🟡 مفعّل' : '🟢 متاح';
+      return `<tr style="border-bottom:1px solid #1a1a1a">
+        <td style="padding:8px 10px;color:#666;font-size:11px">${r.member_num}</td>
+        <td style="padding:8px 10px;color:#F5C842;font-family:monospace;font-size:14px;letter-spacing:2px">${r.code}</td>
+        <td style="padding:8px 10px;font-size:11px">${statusIcon}</td>
+        <td style="padding:8px 10px;font-size:10px;color:#555">${lastSeen}</td>
+        <td style="padding:8px 10px;display:flex;gap:4px">
+          ${isActive ? `<button onclick="adminReset('${r.code}')" style="background:#1a1a1a;border:1px solid #333;border-radius:5px;color:#F5C842;padding:4px 7px;cursor:pointer;font-size:10px">↺</button>` : ''}
+          ${!isBlocked ? `<button onclick="adminBlock('${r.code}')" style="background:#1a1a1a;border:1px solid #333;border-radius:5px;color:#ff4444;padding:4px 7px;cursor:pointer;font-size:10px">🚫</button>` : `<button onclick="adminUnblock('${r.code}')" style="background:#1a1a1a;border:1px solid #333;border-radius:5px;color:#39d353;padding:4px 7px;cursor:pointer;font-size:10px">✓</button>`}
+        </td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('adminBody').innerHTML = `
+      <div style="padding:10px 14px;background:#181818;display:flex;justify-content:space-between;font-size:11px;color:#555">
+        <span>إجمالي: <b style="color:#F5C842">${rows.length}</b></span>
+        <span>مفعّل: <b style="color:#F5C842">${activated}</b></span>
+        <span>محظور: <b style="color:#ff4444">${blocked}</b></span>
+      </div>
+      <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;min-width:380px">
+        <thead><tr style="background:#0d0d0d">
+          <th style="padding:8px 10px;text-align:right;font-size:10px;color:#444">#</th>
+          <th style="padding:8px 10px;text-align:right;font-size:10px;color:#444">الكود</th>
+          <th style="padding:8px 10px;text-align:right;font-size:10px;color:#444">الحالة</th>
+          <th style="padding:8px 10px;text-align:right;font-size:10px;color:#444">آخر ظهور</th>
+          <th style="padding:8px 10px;text-align:right;font-size:10px;color:#444">إجراء</th>
+        </tr></thead>
+        <tbody>${trs}</tbody>
+      </table></div>`;
+  } catch(e) {
+    document.getElementById('adminBody').innerHTML = '<div style="padding:20px;text-align:center;color:#ff4444">❌ تعذر الاتصال بالسيرفر</div>';
+  }
 }
 
-function resetCode(code) {
-  if (!confirm('هتعيد تعيين الكود ده؟')) return;
-  localStorage.removeItem('tefa_used_' + code);
+async function adminReset(code) {
+  if (!confirm('تحرير الكود من الجهاز الحالي؟')) return;
+  await supaFetch(`members?code=eq.${code}`, {
+    method: 'PATCH', prefer: 'return=minimal',
+    body: JSON.stringify({ device_uid: null, activated_at: null })
+  });
   document.getElementById('adminPanel').remove();
   openAdminPanel();
 }
+
+async function adminBlock(code) {
+  if (!confirm('حظر هذا الكود؟')) return;
+  await supaFetch(`members?code=eq.${code}`, {
+    method: 'PATCH', prefer: 'return=minimal',
+    body: JSON.stringify({ status: 'blocked' })
+  });
+  document.getElementById('adminPanel').remove();
+  openAdminPanel();
+}
+
+async function adminUnblock(code) {
+  await supaFetch(`members?code=eq.${code}`, {
+    method: 'PATCH', prefer: 'return=minimal',
+    body: JSON.stringify({ status: 'active' })
+  });
+  document.getElementById('adminPanel').remove();
+  openAdminPanel();
+}
+
+// resetCode moved to adminReset/adminBlock/adminUnblock
 
 // ============================================================
 // APP
