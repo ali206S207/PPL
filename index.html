@@ -834,6 +834,78 @@
   }
   .ws-finish-btn:active { transform: scale(0.97); }
 
+  /* ========== PAUSE MODAL ========== */
+  #pauseModal {
+    display: none;
+    position: fixed; inset: 0; z-index: 9000;
+    background: rgba(0,0,0,0.75);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  #pauseModal.visible { display: flex; }
+  .pause-card {
+    background: var(--surface);
+    border: 1px solid var(--border-bright);
+    border-radius: 24px;
+    padding: 32px 24px;
+    width: 100%; max-width: 320px;
+    text-align: center;
+    position: relative;
+    animation: pause-pop 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes pause-pop {
+    from { transform: scale(0.85); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+  }
+  .pause-card::before {
+    content: '';
+    position: absolute; top: 0; left: 20%; right: 20%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+  .pause-icon { font-size: 48px; margin-bottom: 12px; }
+  .pause-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px; letter-spacing: 4px;
+    color: #fff; margin-bottom: 6px;
+  }
+  .pause-timer {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 22px; font-weight: 700;
+    color: var(--gold); letter-spacing: 3px;
+    margin-bottom: 28px;
+  }
+  .pause-btns { display: flex; flex-direction: column; gap: 12px; }
+  .btn-resume {
+    width: 100%; background: var(--gold);
+    border: none; border-radius: 14px;
+    padding: 16px; cursor: pointer;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px; letter-spacing: 4px;
+    color: #000; font-weight: 900;
+    transition: all 0.2s;
+    position: relative; overflow: hidden;
+  }
+  .btn-resume::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 60%);
+  }
+  .btn-resume:active { transform: scale(0.97); }
+  .btn-resume:hover { background: #ffd84d; box-shadow: 0 0 30px var(--gold-glow); }
+  .btn-finish-modal {
+    width: 100%; background: transparent;
+    border: 1px solid rgba(255,68,68,0.4);
+    border-radius: 14px; padding: 14px;
+    cursor: pointer;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px; letter-spacing: 3px;
+    color: var(--red);
+    transition: all 0.2s;
+  }
+  .btn-finish-modal:active { background: rgba(255,68,68,0.1); transform: scale(0.97); }
+
   /* ========== LOG PAGE ========== */
   .log-empty {
     text-align: center; padding: 60px 20px;
@@ -1565,9 +1637,9 @@
   <div class="lock-sub" style="margin-bottom:40px;animation:fade-up 0.8s ease 0.8s both">Training Program 2026</div>
   <div class="lock-card">
     <div class="lock-week-badge" id="weekBadge">TEFA GYM 2026</div>
-    <div class="lock-label">🔐 أدخل كود الوصول</div>
+    <div class="lock-label">🔐 أدخل الباسورد</div>
     <div class="lock-input-wrap">
-      <input type="text" class="lock-input" id="codeInput" placeholder="XXXXXXXX" maxlength="8" autocomplete="off" autocorrect="off" spellcheck="false">
+      <input type="password" class="lock-input" id="codeInput" placeholder="••••••••" maxlength="20" autocomplete="off" autocorrect="off" spellcheck="false">
       <span class="lock-icon">🏆</span>
     </div>
     <button class="btn-unlock" onclick="checkCode()">دخـول</button>
@@ -1732,6 +1804,19 @@
   </div>
 </div>
 
+<!-- ========== PAUSE MODAL ========== -->
+<div id="pauseModal">
+  <div class="pause-card">
+    <div class="pause-icon">⏸</div>
+    <div class="pause-title">PAUSED</div>
+    <div class="pause-timer" id="pauseTimerDisplay">00:00</div>
+    <div class="pause-btns">
+      <button class="btn-resume" onclick="resumeWorkout()">▶ استكمال التمرين</button>
+      <button class="btn-finish-modal" onclick="finishFromPause()">✅ إنهاء وتسجيل التمرين</button>
+    </div>
+  </div>
+</div>
+
 <!-- ========== WORKOUT FULLSCREEN ========== -->
 <div id="workoutScreen">
   <div class="ws-topbar">
@@ -1811,57 +1896,7 @@
 // DATA
 // ============================================================
 
-const MEMBER_CODES = {
-  '8704': 'علي',
-  '7551': 'عمر',
-  '5970': 'كريم',
-  '5862': 'حسام',
-  '2874': 'وائل',
-  '4622': 'مودي',
-  '5758': 'ياسر',
-  '9122': 'طارق',
-  '8868': 'سامي',
-  '3495': 'رامي',
-  '2910': 'نادر',
-  '9420': 'هاني',
-  '2471': 'ماهر',
-  '1839': 'فادي',
-  '7290': 'زياد',
-  '2241': 'بلال',
-  '6189': 'جاد',
-  '8918': 'عادل',
-  '6450': 'سارة',
-  '4676': 'نور',
-  '1968': 'دينا',
-  '8202': 'ريم',
-  '8269': 'مايا',
-  '2695': 'لينا',
-  '5649': 'هنا',
-  '6337': 'سلمى',
-  '3348': 'رنا',
-  '4440': 'دعاء',
-  '9979': 'منى',
-  '5526': 'هبة',
-  '7327': 'نهى',
-  '5619': 'رهف',
-  '9657': 'أمل',
-  '5782': 'غادة',
-  '9080': 'شيماء',
-  '3024': 'إيمان',
-  '6507': 'رانيا',
-  '2764': 'ولاء',
-  '5728': 'يوسف',
-  '2833': 'إبراهيم',
-  '5368': 'عبدالله',
-  '7083': 'مصطفى',
-  '6597': 'خالد',
-  '8906': 'تامر',
-  '7019': 'عمرو',
-  '4005': 'اسلام',
-  '8677': 'باسم',
-  '2886': 'وليد',
-};
-const ADMIN_PASS = 'TEFA@ADMIN2026';
+const APP_PASSWORD = 'tefa2026';
 
 // PPL Program
 const PPL_PROGRAM = [
@@ -1965,41 +2000,19 @@ function saveState() {
 // ============================================================
 // LOCK SCREEN
 // ============================================================
-// ── Supabase config ──
-const SUPA_URL = 'https://ublurrzfsxikexfhqbns.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVibHVycnpmc3hpa2V4ZmhxYm5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1NDEyODEsImV4cCI6MjA5MzExNzI4MX0.SPlW6T2iBg8tTkFbp1FXDKHaoZrkDlnUAxlUPNhIiFQ';
-
-// ── Device UUID ──
-function getDeviceUID() {
-  let uid = localStorage.getItem('tefa_device_uid');
-  if (uid) return uid;
-  uid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = Math.random() * 16 | 0;
-    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-  });
-  localStorage.setItem('tefa_device_uid', uid);
-  return uid;
-}
-function getFingerprint() { return getDeviceUID(); }
-
-// ── Supabase helpers ──
-async function supaFetch(path, opts={}) {
-  const res = await fetch(SUPA_URL + '/rest/v1/' + path, {
-    ...opts,
-    headers: {
-      'apikey': SUPA_KEY,
-      'Authorization': 'Bearer ' + SUPA_KEY,
-      'Content-Type': 'application/json',
-      'Prefer': opts.prefer || 'return=representation',
-      ...opts.headers
-    }
-  });
-  if (!res.ok) return null;
-  return res.json().catch(() => null);
+// ── REMOVED: device fingerprint ──
+function getFingerprint_UNUSED() {
+  const s = [
+    navigator.language, screen.width, screen.height,
+    screen.colorDepth, new Date().getTimezoneOffset(),
+    navigator.hardwareConcurrency || 0
+  ].join('|');
+  let h = 0;
+  for (let i = 0; i < s.length; i++) { h = Math.imul(31, h) + s.charCodeAt(i) | 0; }
+  return Math.abs(h).toString(36);
 }
 
 function initLock() {
-  // Particles
   const container = document.getElementById('lockParticles');
   for (let i = 0; i < 25; i++) {
     const span = document.createElement('span');
@@ -2009,106 +2022,21 @@ function initLock() {
   document.getElementById('codeInput').addEventListener('keydown', e => { if (e.key==='Enter') checkCode(); });
   document.getElementById('weekBadge').textContent = 'TEFA GYM 2026';
 
-  // Check if already activated on this device
-  checkSavedSession();
-}
-
-async function checkSavedSession() {
-  try {
-    const saved = JSON.parse(localStorage.getItem('tefa_session') || 'null');
-    if (!saved) return;
-
-    // كود موجود في الملف؟
-    if (!MEMBER_CODES[saved.code]) {
-      localStorage.removeItem('tefa_session');
-      showLockError('🚫 تم إلغاء وصولك — تواصل مع TEFA GYM');
-      return;
-    }
-
-    showLockError('⏳ جاري التحقق...');
-
-    // تحقق من السيرفر
-    const rows = await supaFetch(`members?code=eq.${saved.code}&select=device_uid,status,expire_at`);
-
-    if (!rows || rows.length === 0) {
-      localStorage.removeItem('tefa_session');
-      showLockError('🚫 تم إلغاء وصولك — تواصل مع TEFA GYM');
-      return;
-    }
-
-    const member = rows[0];
-
-    // محظور؟
-    if (member.status === 'blocked') {
-      localStorage.removeItem('tefa_session');
-      showLockError('🚫 تم إلغاء وصولك — تواصل مع TEFA GYM');
-      return;
-    }
-
-    // انتهى الاشتراك؟
-    if (member.expire_at && new Date(member.expire_at) < new Date()) {
-      localStorage.removeItem('tefa_session');
-      showLockError('انتهى اشتراكك — تواصل مع TEFA GYM 🏋️');
-      return;
-    }
-
-    // الجهاز مختلف؟
-    const myUID = getDeviceUID();
-    if (member.device_uid && member.device_uid !== myUID) {
-      localStorage.removeItem('tefa_session');
-      showLockError('🚫 هذا الكود مفعّل على جهاز آخر');
-      return;
-    }
-
-    // كل حاجة تمام — حدّث last_seen
-    supaFetch(`members?code=eq.${saved.code}`, {
-      method: 'PATCH',
-      prefer: 'return=minimal',
-      body: JSON.stringify({ last_seen: new Date().toISOString() })
-    });
-
-    showLockError('');
-    unlockApp(saved.name);
-  } catch(e) {
-    // لو مفيش نت — يدخل بالـ session المحفوظة
-    const saved = JSON.parse(localStorage.getItem('tefa_session') || 'null');
-    if (saved && MEMBER_CODES[saved.code]) {
-      showLockError('');
-      unlockApp(saved.name);
-    }
+  // Check if already unlocked
+  if (localStorage.getItem('tefa_unlocked') === '1') {
+    unlockApp();
   }
 }
 
-async function checkCode() {
-  const raw = document.getElementById('codeInput').value.trim().toUpperCase();
-
-  // Admin shortcut
-  if (raw === ADMIN_PASS) { openAdminPanel(); return; }
-
-  const memberName = MEMBER_CODES[raw];
-  if (!memberName) {
-    showLockError('❌ الكود غلط أو غير موجود');
+function checkCode() {
+  const raw = document.getElementById('codeInput').value.trim();
+  if (raw === APP_PASSWORD) {
+    localStorage.setItem('tefa_unlocked', '1');
+    unlockApp();
+  } else {
+    showLockError('❌ الباسورد غلط');
     document.getElementById('codeInput').value = '';
-    return;
   }
-
-  // هل الكود اتفعّل قبل كده على جهاز تاني؟
-  const usedKey = 'tefa_used_' + raw;
-  const usedFP  = localStorage.getItem(usedKey);
-  const myFP    = getFingerprint();
-
-  if (usedFP && usedFP !== myFP) {
-    showLockError('🚫 الكود ده اتفعّل على جهاز تاني');
-    document.getElementById('codeInput').value = '';
-    return;
-  }
-
-  // تفعيل أول مرة
-  const expiry = Date.now() + 30 * 864e5;
-  localStorage.setItem(usedKey, myFP);
-  localStorage.setItem('tefa_session', JSON.stringify({ fp: myFP, expiry, name: memberName, code: raw }));
-
-  unlockApp(memberName);
 }
 
 function showLockError(msg) {
@@ -2117,7 +2045,7 @@ function showLockError(msg) {
   setTimeout(() => err.textContent = '', 3000);
 }
 
-function unlockApp(name) {
+function unlockApp() {
   const lock = document.getElementById('lockScreen');
   const fc = document.getElementById('floatCards');
   if (fc) { fc.style.transition='opacity 0.4s'; fc.style.opacity='0'; setTimeout(()=>fc.style.display='none',400); }
@@ -2126,115 +2054,11 @@ function unlockApp(name) {
   setTimeout(() => {
     lock.style.display = 'none';
     document.getElementById('app').classList.add('visible');
-    // Show member name in topbar
-    // Show member code number in topbar
-    try {
-      const saved = JSON.parse(localStorage.getItem('tefa_session') || '{}');
-      if (saved.code) {
-        const codes = Object.keys(MEMBER_CODES);
-        const idx = codes.indexOf(saved.code);
-        const num = idx >= 0 ? String(idx + 1).padStart(2,'0') : '??';
-        const sub = document.querySelector('.topbar-sub');
-        if (sub) sub.textContent = 'MEMBER #' + num;
-      }
-    } catch(e) {}
     initApp();
   }, 500);
 }
 
-// ── Admin Panel ──
-async function openAdminPanel() {
-  const panel = document.createElement('div');
-  panel.id = 'adminPanel';
-  panel.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0a0a0a;overflow-y:auto;padding:24px 16px;direction:rtl';
-  panel.innerHTML = `
-    <div style="max-width:500px;margin:0 auto">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <div style="font-family:Bebas Neue,sans-serif;font-size:26px;letter-spacing:4px;color:#F5C842">⚙ ADMIN PANEL</div>
-        <button onclick="document.getElementById('adminPanel').remove()" style="background:#222;border:1px solid #333;border-radius:8px;color:#aaa;padding:8px 14px;cursor:pointer;font-size:13px">✕ خروج</button>
-      </div>
-      <div id="adminBody" style="background:#111;border:1px solid #333;border-radius:14px;overflow:hidden;margin-bottom:16px">
-        <div style="padding:20px;text-align:center;color:#555">⏳ جاري التحميل...</div>
-      </div>
-    </div>`;
-  document.body.appendChild(panel);
-
-  try {
-    const rows = await supaFetch('members?select=code,member_num,device_uid,status,last_seen,expire_at&order=member_num.asc');
-    if (!rows) throw new Error('no data');
-
-    const activated = rows.filter(r => r.device_uid).length;
-    const blocked   = rows.filter(r => r.status === 'blocked').length;
-
-    const trs = rows.map(r => {
-      const isActive   = !!r.device_uid;
-      const isBlocked  = r.status === 'blocked';
-      const lastSeen   = r.last_seen ? new Date(r.last_seen).toLocaleDateString('ar-EG') : '—';
-      const statusIcon = isBlocked ? '🔴 محظور' : isActive ? '🟡 مفعّل' : '🟢 متاح';
-      return `<tr style="border-bottom:1px solid #1a1a1a">
-        <td style="padding:8px 10px;color:#666;font-size:11px">${r.member_num}</td>
-        <td style="padding:8px 10px;color:#F5C842;font-family:monospace;font-size:14px;letter-spacing:2px">${r.code}</td>
-        <td style="padding:8px 10px;font-size:11px">${statusIcon}</td>
-        <td style="padding:8px 10px;font-size:10px;color:#555">${lastSeen}</td>
-        <td style="padding:8px 10px;display:flex;gap:4px">
-          ${isActive ? `<button onclick="adminReset('${r.code}')" style="background:#1a1a1a;border:1px solid #333;border-radius:5px;color:#F5C842;padding:4px 7px;cursor:pointer;font-size:10px">↺</button>` : ''}
-          ${!isBlocked ? `<button onclick="adminBlock('${r.code}')" style="background:#1a1a1a;border:1px solid #333;border-radius:5px;color:#ff4444;padding:4px 7px;cursor:pointer;font-size:10px">🚫</button>` : `<button onclick="adminUnblock('${r.code}')" style="background:#1a1a1a;border:1px solid #333;border-radius:5px;color:#39d353;padding:4px 7px;cursor:pointer;font-size:10px">✓</button>`}
-        </td>
-      </tr>`;
-    }).join('');
-
-    document.getElementById('adminBody').innerHTML = `
-      <div style="padding:10px 14px;background:#181818;display:flex;justify-content:space-between;font-size:11px;color:#555">
-        <span>إجمالي: <b style="color:#F5C842">${rows.length}</b></span>
-        <span>مفعّل: <b style="color:#F5C842">${activated}</b></span>
-        <span>محظور: <b style="color:#ff4444">${blocked}</b></span>
-      </div>
-      <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;min-width:380px">
-        <thead><tr style="background:#0d0d0d">
-          <th style="padding:8px 10px;text-align:right;font-size:10px;color:#444">#</th>
-          <th style="padding:8px 10px;text-align:right;font-size:10px;color:#444">الكود</th>
-          <th style="padding:8px 10px;text-align:right;font-size:10px;color:#444">الحالة</th>
-          <th style="padding:8px 10px;text-align:right;font-size:10px;color:#444">آخر ظهور</th>
-          <th style="padding:8px 10px;text-align:right;font-size:10px;color:#444">إجراء</th>
-        </tr></thead>
-        <tbody>${trs}</tbody>
-      </table></div>`;
-  } catch(e) {
-    document.getElementById('adminBody').innerHTML = '<div style="padding:20px;text-align:center;color:#ff4444">❌ تعذر الاتصال بالسيرفر</div>';
-  }
-}
-
-async function adminReset(code) {
-  if (!confirm('تحرير الكود من الجهاز الحالي؟')) return;
-  await supaFetch(`members?code=eq.${code}`, {
-    method: 'PATCH', prefer: 'return=minimal',
-    body: JSON.stringify({ device_uid: null, activated_at: null })
-  });
-  document.getElementById('adminPanel').remove();
-  openAdminPanel();
-}
-
-async function adminBlock(code) {
-  if (!confirm('حظر هذا الكود؟')) return;
-  await supaFetch(`members?code=eq.${code}`, {
-    method: 'PATCH', prefer: 'return=minimal',
-    body: JSON.stringify({ status: 'blocked' })
-  });
-  document.getElementById('adminPanel').remove();
-  openAdminPanel();
-}
-
-async function adminUnblock(code) {
-  await supaFetch(`members?code=eq.${code}`, {
-    method: 'PATCH', prefer: 'return=minimal',
-    body: JSON.stringify({ status: 'active' })
-  });
-  document.getElementById('adminPanel').remove();
-  openAdminPanel();
-}
-
-// resetCode moved to adminReset/adminBlock/adminUnblock
+// ── Admin panel removed ──
 
 // ============================================================
 // APP
@@ -2484,10 +2308,38 @@ function updateWorkoutProgress() {
 }
 
 function exitWorkout() {
+  // Pause the timer
   clearInterval(workoutTimer);
   workoutTimer = null;
-  document.getElementById('workoutScreen').classList.remove('visible');
-  showToast('تمرين موقوف مؤقتاً ⏸');
+
+  // Show current time in pause modal
+  const m = Math.floor(workoutSeconds / 60);
+  const s = workoutSeconds % 60;
+  document.getElementById('pauseTimerDisplay').textContent =
+    String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+
+  document.getElementById('pauseModal').classList.add('visible');
+}
+
+function resumeWorkout() {
+  document.getElementById('pauseModal').classList.remove('visible');
+
+  // Resume timer from where it stopped
+  workoutTimer = setInterval(() => {
+    workoutSeconds++;
+    const m = Math.floor(workoutSeconds / 60);
+    const s = workoutSeconds % 60;
+    const badge = document.getElementById('wsTimerBadge');
+    if (badge) {
+      badge.textContent = '⏱ ' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+      badge.classList.toggle('active', workoutSeconds % 2 === 0);
+    }
+  }, 1000);
+}
+
+function finishFromPause() {
+  document.getElementById('pauseModal').classList.remove('visible');
+  finishWorkout();
 }
 
 function finishWorkout() {
